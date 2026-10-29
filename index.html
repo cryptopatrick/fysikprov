@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>Atom- och kärnfysikprov</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: ChatGPT-lik läsvy – smal centrerad spalt, fast toppbalk med klocka, svarsfält som rundade "composer"-bubblor */
+:root {
+  --bg: #ffffff;
+  --fg: #0d0d0d;
+  --muted: #5d5d5d;
+  --surface: #f4f4f4;
+  --border: #e5e5e5;
+  --btn: #0d0d0d;
+  --btn-fg: #ffffff;
+  --ok: #10a37f;
+  --ok-bg: #e7f6f1;
+  --warn: #c2700a;
+  --bad: #d92d20;
+  --bad-bg: #fdecea;
+  --font: ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #212121; --fg: #ececec; --muted: #b4b4b4; --surface: #303030; --border: #3d3d3d;
+    --btn: #ececec; --btn-fg: #0d0d0d; --ok: #2fc39a; --ok-bg: #173a30; --warn: #f0a840;
+    --bad: #f97066; --bad-bg: #44211f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #212121; --fg: #ececec; --muted: #b4b4b4; --surface: #303030; --border: #3d3d3d;
+  --btn: #ececec; --btn-fg: #0d0d0d; --ok: #2fc39a; --ok-bg: #173a30; --warn: #f0a840;
+  --bad: #f97066; --bad-bg: #44211f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 16px; line-height: 1.65; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.topbar-inner { max-width: 48rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; }
+.brand { font-weight: 600; font-size: 1.05rem; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand span { color: var(--muted); font-weight: 400; }
+.clock { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.clock-time { font-family: var(--mono); font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.clock-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.clock.running .clock-dot { background: var(--ok); animation: pulse 1.2s ease-in-out infinite; }
+.clock.low .clock-time, .clock.low .clock-dot { color: var(--warn); background-color: transparent; }
+.clock.low .clock-dot { background: var(--warn); }
+.clock.critical .clock-time { color: var(--bad); }
+.clock.critical .clock-dot { background: var(--bad); }
+.bar { height: 4px; background: var(--surface); }
+.bar-fill { height: 100%; width: 100%; background: var(--ok); transition: width 1s linear, background-color .3s; }
+.clock-wrap.low .bar-fill { background: var(--warn); }
+.clock-wrap.critical .bar-fill { background: var(--bad); }
+@keyframes pulse { 50% { opacity: .35; } }
+
+main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 96px; }
+.col { max-width: 48rem; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+
+h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 8px; text-wrap: balance; }
+h2 { font-size: 1.25rem; line-height: 1.35; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 0; }
+
+.intro { display: flex; flex-direction: column; gap: 16px; }
+.intro ul { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; }
+.start-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; margin-top: 8px; }
+.name-input {
+  flex: 1 1 240px; min-width: 0; font: inherit; color: var(--fg); background: var(--surface);
+  border: 1px solid transparent; border-radius: 24px; padding: 12px 20px;
+}
+.name-input:focus, textarea:focus { outline: none; border-color: var(--muted); }
+.btn {
+  font: inherit; font-weight: 600; border: 0; border-radius: 999px; padding: 12px 24px; cursor: pointer;
+  background: var(--btn); color: var(--btn-fg);
+}
+.btn:hover { opacity: .85; }
+.btn:focus-visible, .name-input:focus-visible, textarea:focus-visible { outline: 2px solid var(--ok); outline-offset: 2px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+.hint { font-size: .9rem; color: var(--bad); min-height: 1.4em; }
+
+.q { display: flex; flex-direction: column; gap: 14px; }
+.q-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.q-head h2 { min-width: 0; }
+.score { flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums; border-radius: 999px; padding: 2px 12px; font-size: .9rem; }
+.score.full { background: var(--ok-bg); color: var(--ok); }
+.score.part { background: var(--surface); color: var(--fg); }
+.score.none { background: var(--bad-bg); color: var(--bad); }
+.fields { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.field { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+.num { width: 28px; height: 28px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; font-size: .85rem; font-weight: 600; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.field-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+textarea {
+  width: 100%; resize: none; overflow: hidden; font: inherit; line-height: 1.5; color: var(--fg);
+  background: var(--surface); border: 1px solid transparent; border-radius: 20px; padding: 10px 18px; min-height: 46px;
+}
+textarea:disabled { opacity: 1; }
+.field.ok textarea { border-color: var(--ok); background: var(--ok-bg); }
+.field.bad textarea { border-color: var(--bad); }
+.field.ok .num { background: var(--ok); color: #fff; }
+.field.bad .num { background: var(--bad); color: #fff; }
+.verdict { font-size: .85rem; padding-left: 18px; }
+.field.ok .verdict { color: var(--ok); }
+.field.bad .verdict { color: var(--bad); }
+
+details.facit { background: var(--surface); border-radius: 16px; padding: 12px 18px; }
+details.facit summary { cursor: pointer; font-weight: 600; }
+details.facit ol { margin: 10px 0 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+details.facit li.hit::marker { color: var(--ok); }
+details.facit li.miss { color: var(--muted); }
+details.facit li .tag { font-size: .8rem; font-weight: 600; margin-left: 6px; }
+details.facit li.hit .tag { color: var(--ok); }
+details.facit li.miss .tag { color: var(--bad); }
+
+.submit-zone { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 8px; }
+.submit-zone .btn { font-size: 1.15rem; letter-spacing: .06em; padding: 16px 48px; }
+
+.result { border: 1px solid var(--border); border-radius: 24px; padding: 28px; display: flex; flex-direction: column; gap: 20px; }
+.result-top { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; }
+.grade { font-size: 5rem; font-weight: 700; line-height: 1; width: 1.2em; text-align: center; }
+.result-facts { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.result-facts strong { font-size: 1.3rem; }
+.scale { display: flex; gap: 6px; flex-wrap: wrap; }
+.scale div { flex: 1 1 0; min-width: 52px; text-align: center; border-radius: 12px; padding: 6px 4px; background: var(--surface); font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.scale div b { display: block; font-size: 1.1rem; color: var(--fg); }
+.scale div.on { background: var(--btn); color: var(--btn-fg); }
+.scale div.on b { color: var(--btn-fg); }
+.mail-status { font-size: .9rem; color: var(--muted); }
+.result-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+@media (max-width: 480px) {
+  .brand span { display: none; }
+  .clock-time { font-size: 1.35rem; }
+  .result { padding: 20px; }
+  .grade { font-size: 4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clock.running .clock-dot { animation: none; }
+  .bar-fill { transition: none; }
+}
+</style>
+
+<div class="clock-wrap" id="clockWrap">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">Fysikprov <span>· Atom- och kärnfysik</span></div>
+      <div class="clock" id="clock" aria-live="off">
+        <span class="clock-dot" aria-hidden="true"></span>
+        <span class="clock-time" id="clockTime">45:00</span>
+      </div>
+    </div>
+  </header>
+  <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+</div>
+
+<main>
+  <div class="col">
+    <section class="result" id="result" hidden></section>
+
+    <section class="intro" id="intro">
+      <div>
+        <h1>Prov: Atom- och kärnfysik</h1>
+        <p class="muted">Åk 9 · 15 frågor · 45 minuter</p>
+      </div>
+      <p>Varje fråga har lika många svarsfält som det finns steg att komma ihåg. Skriv ett steg i varje fält, med egna ord. Ordningen spelar ingen roll för poängen, men försök skriva stegen i rätt ordning.</p>
+      <ul>
+        <li>Klockan startar när du trycker på <strong>Starta provet</strong>, och provet lämnas in automatiskt när tiden är slut.</li>
+        <li>Varje rätt steg ger 1 poäng. Totalt finns 78 poäng.</li>
+        <li>När du är klar trycker du på <strong>LÄMNA IN</strong> längst ner.</li>
+      </ul>
+      <div class="start-row">
+        <label for="studentName" class="sr" hidden>Ditt namn</label>
+        <input id="studentName" class="name-input" type="text" placeholder="Skriv ditt för- och efternamn" autocomplete="name">
+        <button class="btn" id="startBtn" type="button">Starta provet</button>
+      </div>
+      <p class="hint" id="startHint"></p>
+    </section>
+
+    <div id="questions" class="col" hidden></div>
+
+    <div class="submit-zone" id="submitZone" hidden>
+      <button class="btn" id="submitBtn" type="button">LÄMNA IN</button>
+      <p class="hint" id="submitHint"></p>
+    </div>
+  </div>
+</main>
+
+<script>
+// Hit skickas resultatet. Lämna tomt för att inte skicka något mail.
+const MOTTAGARE_EPOST = "";
+const PROVTID_MIN = 45;
+const STORE_KEY = "prov-atom-karnfysik-v1";
+
+// k = nyckelordsgrupper. Ett fält räknas som rätt för steget om det innehåller minst ett ord ur VARJE grupp.
+// Orden skrivs utan å/ä/ö (texten normaliseras) och matchas som ordbörjan, med tolerans för ett stavfel.
+const QUESTIONS = [
+  { t: "Hur är en atom uppbyggd?", s: [
+    { f: "Atomen har en kärna, som består av protoner och neutroner.", k: [["karn"], ["proton", "neutron"]] },
+    { f: "Protonerna är positiva. Neutronerna saknar laddning.", k: [["proton", "neutron"], ["positiv", "plus", "laddad", "laddning", "oladdad", "neutral"]] },
+    { f: "Elektronerna finns runt kärnan och är negativa.", k: [["elektron"], ["negativ", "runt", "kring", "utanfor", "skal"]] },
+    { f: "En atom är normalt neutral: lika många protoner som elektroner.", k: [["neutral", "lika manga", "tar ut varandra", "oladdad"]] },
+    { f: "Nästan all massa finns i kärnan.", k: [["massa", "vager", "tung", "vikt"]] },
+  ]},
+  { t: "Hur upptäckte Rutherford atomkärnan?", s: [
+    { f: "Rutherford sköt positivt laddade partiklar mot en tunn guldfolie.", k: [["guld", "folie"]] },
+    { f: "De flesta partiklarna gick rakt igenom – atomen är mest tomrum.", k: [["igenom", "tomrum", "tom ", "rakt genom"]] },
+    { f: "Några partiklar ändrade riktning.", k: [["riktning", "boj", "avlank", "andrade", "avvek", "sned"]] },
+    { f: "Ett fåtal partiklar studsade tillbaka.", k: [["studs", "tillbaka", "reflekt", "rekyl"]] },
+    { f: "Slutsats: atomen har en liten, tät och positivt laddad kärna.", k: [["karn"]] },
+  ]},
+  { t: "Hur fungerar elektromagnetisk strålning från atomer?", s: [
+    { f: "Atomen får energi, till exempel genom uppvärmning.", k: [["atom", "amne"], ["energi", "varm", "hett", "upphett"]] },
+    { f: "En elektron tar upp energin och hamnar i ett tillstånd med högre energi.", k: [["elektron"], ["hogre", "upp", "exciter", "hoppar"]] },
+    { f: "Elektronen återgår till ett tillstånd med lägre energi.", k: [["ater", "tillbaka", "lagre", "faller", "ner", "ned"]] },
+    { f: "Energi frigörs och sänds ut som elektromagnetisk strålning.", k: [["stral", "ljus", "foton", "frigor", "sands ut", "sander ut", "avger"]] },
+    { f: "Strålningens energi beror på energiskillnaden (t.ex. synligt ljus eller röntgen).", k: [["skillnad", "olika", "synligt", "rontgen", "vaglangd", "farg", "beror"]] },
+  ]},
+  { t: "Hur fungerar radioaktiv strålning?", s: [
+    { f: "Atomkärnan är instabil.", k: [["instabil", "ostabil", "inte stabil"]] },
+    { f: "Alfastrålning: två protoner och två neutroner.", k: [["alfa"]] },
+    { f: "Betastrålning: en neutron blir en proton och en elektron som lämnar kärnan.", k: [["beta"]] },
+    { f: "Gammastrålning: energirik elektromagnetisk strålning.", k: [["gamma"]] },
+    { f: "Kärnan förändras – ett nytt grundämne kan bildas.", k: [["grundamne", "forandras", "andras", "nytt amne", "annat amne", "omvandlas"]] },
+    { f: "Olika genomträngningsförmåga: alfa stoppas lätt, gamma tränger igenom mest.", k: [["genomtrang", "tranger", "stoppa", "rackvidd", "papper", "bly", "betong"]] },
+  ]},
+  { t: "Hur fungerar halveringstid?", s: [
+    { f: "Ett radioaktivt ämne innehåller instabila atomkärnor.", k: [["instabil", "radioaktiv", "ostabil"]] },
+    { f: "Kärnorna sönderfaller slumpmässigt.", k: [["slump"]] },
+    { f: "Halveringstiden är tiden det tar för hälften av kärnorna att sönderfalla.", k: [["tid"], ["halft", "halva", "halv"]] },
+    { f: "Efter en halveringstid återstår hälften (1 000 → 500).", k: [["500", "kvar", "aterstar", "aterstod"]] },
+    { f: "Efter varje ny halveringstid halveras det som är kvar (→ 250 → 125).", k: [["250", "125", "varje", "igen", "ytterligare", "sedan", "fortsatter"]] },
+  ]},
+  { t: "Hur fungerar kol-14-metoden?", s: [
+    { f: "Levande organismer tar upp kol, så andelen kol-14 är stabil.", k: [["lev"], ["kol", "c 14", "tar upp", "andas", "ater", "fotosyntes"]] },
+    { f: "Organismen dör och slutar ta upp kol.", k: [["dor", "dod", "dott"]] },
+    { f: "Kol-14 sönderfaller och minskar (blir kväve-14).", k: [["sonderf", "minsk", "avtar", "kvave", "forsvinn"]] },
+    { f: "Kol-14 har en halveringstid på cirka 5 730 år.", k: [["5730", "5700", "halveringstid"]] },
+    { f: "Forskare mäter mängden kol-14 i t.ex. trä eller ben.", k: [["mat", "undersok", "analys"]] },
+    { f: "Mängden jämförs med stabilt kol (kol-12).", k: [["kol 12", "c 12", "kol12", "c12", "jamfor", "forhallande", "stabilt kol"]] },
+    { f: "Materialets ålder beräknas – mindre kol-14 betyder äldre.", k: [["alder", "aldre", "gammal", "berakna", "rakna", "datera"]] },
+  ]},
+  { t: "Hur fungerar en kärnreaktor?", s: [
+    { f: "Uran (uran-235) används som bränsle i bränslestavar.", k: [["uran", "bransle"]] },
+    { f: "En neutron träffar en urankärna.", k: [["neutron"], ["traff", "fang", "skjut", "krock", "in i", "slar"]] },
+    { f: "Kärnan klyvs (fission) – energi och nya neutroner frigörs.", k: [["klyv", "fission", "delas", "splittr"]] },
+    { f: "En kedjereaktion uppstår.", k: [["kedje", "fler"]] },
+    { f: "Reaktionen kontrolleras med styrstavar (och vatten).", k: [["styrstav", "kontroll", "regler", "styr"]] },
+    { f: "Värmen kokar vatten till ånga som driver en turbin.", k: [["anga", "kok", "vatten", "varme"]] },
+    { f: "Turbinen driver en generator som producerar elektricitet.", k: [["generator", "elektricitet", " el ", "strom", "elenergi"]] },
+  ]},
+  { t: "Hur styr man en kärnreaktor?", s: [
+    { f: "Neutroner startar kärnklyvningar.", k: [["neutron"], ["klyv", "start", "orsak", "fission"]] },
+    { f: "Vattnet bromsar neutronerna – det fungerar som moderator.", k: [["moderator", "broms", "saktar", "vatten"]] },
+    { f: "Styrstavarna absorberar neutroner.", k: [["styrstav", "absorb", "fangar"]] },
+    { f: "Reaktorn kan regleras eller stoppas (snabbstopp).", k: [["stopp", "stang", "regler", "avbryt", "minskar"]] },
+  ]},
+  { t: "Hur fungerar kärnklyvning och kedjereaktion?", s: [
+    { f: "En neutron träffar en klyvbar kärna, t.ex. uran-235.", k: [["neutron", "uran"], ["traff", "fang", "krock", "uran", "skjut"]] },
+    { f: "Kärnan blir instabil och delas i två mindre kärnor.", k: [["delas", "klyv", "tva mindre", "splittr", "instabil", "fission"]] },
+    { f: "Energi frigörs och nya neutroner bildas.", k: [["energi", "varme"]] },
+    { f: "De nya neutronerna kan klyva fler kärnor.", k: [["nya neutron", "fler", "andra karnor", "ytterligare", "nasta"]] },
+    { f: "Reaktionen fortsätter som en kedjereaktion.", k: [["kedje", "fortsatter", "kontroller", "regler"]] },
+  ]},
+  { t: "Hur fungerar fusion – solens energikälla?", s: [
+    { f: "Det finns lätta atomkärnor, i solen främst väte.", k: [["latt", "vate"]] },
+    { f: "Temperaturen är extremt hög, så kärnorna rör sig snabbt.", k: [["temperatur", "varm", "hett", "het ", "snabb", "tryck"]] },
+    { f: "Kärnorna förenas (smälter samman) när de kommer nära.", k: [["forena", "smalt", "samman", "ihop", "kollider", "nara"]] },
+    { f: "En tyngre kärna bildas – väte blir helium.", k: [["tyngre", "helium"]] },
+    { f: "Energi frigörs; lite massa blir energi.", k: [["energi"]] },
+  ]},
+  { t: "Vad betyder Einsteins formel E = mc²?", s: [
+    { f: "Materia har massa, och massa är kopplad till energi.", k: [["materia", "koppl", "samband", "hanger ihop", "massa och energi", "energi och massa", "massa ar energi"]] },
+    { f: "Massa kan omvandlas till energi.", k: [["omvandl", "blir energi", "bli energi", "till energi", "mindre massa"]] },
+    { f: "Masskillnaden (massdefekten) blir energi.", k: [["skillnad", "massdefekt", "forsvinn", "minskar"]] },
+    { f: "Ljusets hastighet (c) är så stor att lite massa ger mycket energi.", k: [["ljus", "hastighet", " c ", "300"]] },
+  ]},
+  { t: "Hur fungerar röntgenstrålning?", s: [
+    { f: "Röntgenapparaten skapar energirik elektromagnetisk strålning.", k: [["skapa", "alstr", "sander", "apparat", "maskin", "hog energi", "energirik", "elektromagnet"]] },
+    { f: "Strålningen passerar genom kroppen; vävnader absorberar olika mycket.", k: [["kropp", "passer", "genom", "vavnad"]] },
+    { f: "Skelettet absorberar mer strålning än mjukdelar.", k: [["skelett", " ben", "skelet"]] },
+    { f: "En detektor registrerar strålningen som passerat.", k: [["detektor", "plat", "film", "sensor", "registrer", "mater", "fangar"]] },
+    { f: "En röntgenbild skapas där skelettet syns.", k: [["bild"]] },
+  ]},
+  { t: "Hur fungerar den fotoelektriska effekten?", s: [
+    { f: "Ljus riktas mot en metallplatta.", k: [["metall"]] },
+    { f: "Ljuset består av energikvanta, fotoner.", k: [["foton", "kvant", "ljuspartik", "energipaket"]] },
+    { f: "En elektron absorberar energi från en foton.", k: [["absorb", "tar upp", "far energi", "overfor", "ger energi", "ger elektron"]] },
+    { f: "Om energin räcker lämnar elektronen metallen.", k: [["lamnar", "frigor", "loss", "rycks", "slapper", "racker"]] },
+    { f: "De frigjorda elektronerna kan ge elektrisk ström.", k: [["strom", "krets"]] },
+  ]},
+  { t: "Vad är isotoper?", s: [
+    { f: "Alla atomer av samma grundämne har samma antal protoner.", k: [["proton"], ["samma"]] },
+    { f: "Kärnorna kan ha olika många neutroner.", k: [["neutron"], ["olika", "antal", "fler", "farre"]] },
+    { f: "Atomer av samma grundämne med olika antal neutroner kallas isotoper.", k: [["isotop"]] },
+    { f: "Isotoper har olika masstal; vissa är stabila, andra radioaktiva.", k: [["masstal", "stabil", "radioaktiv", "massa", "vager"]] },
+  ]},
+  { t: "Vilka forskare gjorde de viktigaste upptäckterna? Skriv namn + vad de gjorde.", s: [
+    { f: "Wilhelm Röntgen – upptäckte röntgenstrålningen 1895.", k: [["rontgen", "wilhelm"], ["stral", "1895"]] },
+    { f: "J. J. Thomson – upptäckte elektronen 1897.", k: [["thomson", "tomson"], ["elektron", "1897"]] },
+    { f: "Albert Einstein – förklarade Brownsk rörelse och den fotoelektriska effekten.", k: [["einstein"], ["brown", "fotoelektr", "ljus", "atom", "foton", "pollen", "rorelse", "relativ", "e mc", "emc"]] },
+    { f: "Ernest Rutherford – visade att atomen har en liten positiv kärna.", k: [["rutherford", "ruterford", "ernest"], ["karn", "guld"]] },
+    { f: "Niels Bohr – atommodell med bestämda energinivåer.", k: [["bohr", "niels"], ["niva", "nivaer", "skal", "bana", "modell"]] },
+    { f: "Henri Becquerel – upptäckte radioaktiviteten 1896.", k: [["becquerel", "bequerel", "beckerel", "bekerel", "henri"], ["radioaktiv", "1896", "stral"]] },
+  ]},
+];
+
+const GRADES = [
+  { g: "A", min: 90 }, { g: "B", min: 78 }, { g: "C", min: 65 }, { g: "D", min: 50 }, { g: "E", min: 40 }, { g: "F", min: 0 },
+];
+
+/* ---------- Rättning ---------- */
+function norm(s) {
+  return " " + s.toLowerCase()
+    .replace(/(\d)[\s.,](?=\d{3}(\D|$))/g, "$1")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ").trim() + " ";
+}
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function has(text, tokens, alt) {
+  if (text.includes(alt)) return true;
+  if (alt.includes(" ") || alt.length < 5) return false;
+  return tokens.some(t => t.length >= alt.length - 1 && lev(t.slice(0, alt.length), alt) <= 1);
+}
+function stepMatches(answer, step) {
+  const text = norm(answer);
+  if (text.trim().length < 2) return false;
+  const tokens = text.trim().split(" ");
+  return step.k.every(group => group.some(alt => has(text, tokens, alt)));
+}
+// Varje fält kan bara ge poäng för ett steg: maximal matchning mellan steg och fält.
+function gradeQuestion(q, answers) {
+  const adj = q.s.map(step => answers.map((a, i) => stepMatches(a, step) ? i : -1).filter(i => i >= 0));
+  const fieldToStep = new Array(answers.length).fill(-1);
+  function tryStep(s, seen) {
+    for (const f of adj[s]) {
+      if (seen[f]) continue;
+      seen[f] = true;
+      if (fieldToStep[f] === -1 || tryStep(fieldToStep[f], seen)) { fieldToStep[f] = s; return true; }
+    }
+    return false;
+  }
+  q.s.forEach((_, s) => tryStep(s, []));
+  return { fieldToStep, score: fieldToStep.filter(s => s >= 0).length, max: q.s.length };
+}
+function gradeFor(pct) { return GRADES.find(x => pct >= x.min).g; }
+
+/* ---------- Tillstånd ---------- */
+const TOTAL_MS = PROVTID_MIN * 60 * 1000;
+let state = { name: "", startedAt: null, answers: QUESTIONS.map(q => q.s.map(() => "")), submittedAt: null, mailSent: false };
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) { const s = JSON.parse(raw); if (s && Array.isArray(s.answers) && s.answers.length === QUESTIONS.length) state = s; }
+  } catch (e) {}
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+
+/* ---------- Gränssnitt ---------- */
+const $ = id => document.getElementById(id);
+const qWrap = $("questions");
+
+function autoGrow(el) { el.style.height = "auto"; el.style.height = el.scrollHeight + 2 + "px"; }
+
+function buildQuestions() {
+  qWrap.innerHTML = "";
+  QUESTIONS.forEach((q, qi) => {
+    const sec = document.createElement("section");
+    sec.className = "q";
+    sec.id = "q" + (qi + 1);
+    sec.innerHTML = `
+      <div class="q-head"><h2>${qi + 1}. ${q.t}</h2><span class="score" hidden></span></div>
+      <p class="muted">Kom ihåg <strong>${q.s.length} steg</strong>.</p>
+      <ol class="fields"></ol>`;
+    const ol = sec.querySelector(".fields");
+    q.s.forEach((_, si) => {
+      const li = document.createElement("li");
+      li.className = "field";
+      const id = `a-${qi}-${si}`;
+      li.innerHTML = `<span class="num" aria-hidden="true">${si + 1}</span>
+        <div class="field-body">
+          <textarea id="${id}" rows="1" aria-label="Fråga ${qi + 1}, steg ${si + 1}" placeholder="Steg ${si + 1}…"></textarea>
+          <span class="verdict" hidden></span>
+        </div>`;
+      const ta = li.querySelector("textarea");
+      ta.value = state.answers[qi][si] || "";
+      ta.addEventListener("input", () => {
+        state.answers[qi][si] = ta.value;
+        autoGrow(ta);
+        save();
+        $("submitHint").textContent = "";
+        armed = false;
+      });
+      ol.appendChild(li);
+    });
+    qWrap.appendChild(sec);
+    if (qi < QUESTIONS.length - 1) qWrap.appendChild(document.createElement("hr"));
+  });
+  requestAnimationFrame(() => qWrap.querySelectorAll("textarea").forEach(autoGrow));
+}
+
+function fmt(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+
+let ticker = null;
+function tick() {
+  const left = TOTAL_MS - (Date.now() - state.startedAt);
+  $("clockTime").textContent = fmt(left);
+  $("barFill").style.width = Math.max(0, left / TOTAL_MS * 100) + "%";
+  const low = left <= 10 * 60000, crit = left <= 5 * 60000;
+  [$("clock"), $("clockWrap")].forEach(el => { el.classList.toggle("low", low && !crit); el.classList.toggle("critical", crit); });
+  if (left <= 0) submit(true);
+}
+
+function startExam() {
+  const name = $("studentName").value.trim();
+  if (name.length < 2) { $("startHint").textContent = "Skriv ditt namn innan du startar provet."; $("studentName").focus(); return; }
+  state.name = name;
+  state.startedAt = Date.now();
+  save();
+  showRunning();
+}
+
+function showRunning() {
+  $("intro").hidden = true;
+  qWrap.hidden = false;
+  $("submitZone").hidden = false;
+  $("clock").classList.add("running");
+  buildQuestions();
+  tick();
+  ticker = setInterval(tick, 1000);
+  window.scrollTo({ top: 0 });
+}
+
+let armed = false;
+function submit(timeUp) {
+  if (state.submittedAt) return;
+  if (!timeUp) {
+    const empty = state.answers.flat().filter(a => !a.trim()).length;
+    if (empty && !armed) {
+      armed = true;
+      $("submitHint").textContent = `Du har ${empty} tomma fält. Tryck på LÄMNA IN igen om du vill lämna in ändå.`;
+      return;
+    }
+  }
+  state.submittedAt = Math.min(Date.now(), state.startedAt + TOTAL_MS);
+  save();
+  showResult(timeUp);
+}
+
+function computeAll() {
+  const per = QUESTIONS.map((q, qi) => gradeQuestion(q, state.answers[qi]));
+  const score = per.reduce((n, r) => n + r.score, 0);
+  const max = per.reduce((n, r) => n + r.max, 0);
+  const pct = Math.round(score / max * 100);
+  return { per, score, max, pct, grade: gradeFor(pct) };
+}
+
+function showResult(timeUp) {
+  clearInterval(ticker);
+  $("clock").classList.remove("running");
+  $("intro").hidden = true;
+  qWrap.hidden = false;
+  if (!qWrap.children.length) buildQuestions();
+  $("submitZone").hidden = true;
+
+  const r = computeAll();
+  const used = state.submittedAt - state.startedAt;
+  $("clockTime").textContent = fmt(TOTAL_MS - used);
+
+  // Markera varje fråga
+  QUESTIONS.forEach((q, qi) => {
+    const sec = $("q" + (qi + 1));
+    const res = r.per[qi];
+    const badge = sec.querySelector(".score");
+    badge.hidden = false;
+    badge.textContent = `${res.score}/${res.max}`;
+    badge.className = "score " + (res.score === res.max ? "full" : res.score === 0 ? "none" : "part");
+    sec.querySelectorAll(".field").forEach((li, fi) => {
+      const ta = li.querySelector("textarea");
+      ta.disabled = true;
+      const v = li.querySelector(".verdict");
+      v.hidden = false;
+      const s = res.fieldToStep[fi];
+      if (s >= 0) { li.classList.add("ok"); v.textContent = `✓ Rätt – motsvarar steg ${s + 1} i facit`; }
+      else { li.classList.add("bad"); v.textContent = ta.value.trim() ? "✗ Matchar inget av de saknade stegen" : "✗ Tomt"; }
+    });
+    const hit = new Set(res.fieldToStep.filter(s => s >= 0));
+    const det = document.createElement("details");
+    det.className = "facit";
+    if (res.score < res.max) det.open = true;
+    det.innerHTML = `<summary>Facit – ${q.s.length} steg</summary><ol>${q.s.map((st, si) =>
+      `<li class="${hit.has(si) ? "hit" : "miss"}">${st.f}<span class="tag">${hit.has(si) ? "✓ med" : "saknas"}</span></li>`).join("")}</ol>`;
+    sec.appendChild(det);
+  });
+
+  // Sammanfattning
+  const box = $("result");
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="result-top">
+      <div class="grade" aria-label="Betyg ${r.grade}">${r.grade}</div>
+      <div class="result-facts">
+        <strong>${escapeHtml(state.name)}</strong>
+        <span>${r.score} av ${r.max} poäng (${r.pct} %)</span>
+        <span class="muted">Tid: ${fmt(used)} av ${PROVTID_MIN}:00${timeUp ? " – tiden tog slut" : ""}</span>
+      </div>
+    </div>
+    <div class="scale">${GRADES.slice().reverse().map(x =>
+      `<div class="${x.g === r.grade ? "on" : ""}"><b>${x.g}</b>${x.g === "F" ? "&lt; 40 %" : "≥ " + x.min + " %"}</div>`).join("")}</div>
+    <p class="mail-status" id="mailStatus"></p>
+    <div class="result-actions"><button class="btn btn-ghost" id="restartBtn" type="button">Gör om provet</button></div>`;
+  $("restartBtn").addEventListener("click", restart);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  sendMail(r, used);
+}
+
+function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+function reportText(r, used) {
+  const lines = [`${state.name}: betyg ${r.grade}, ${r.score}/${r.max} poäng (${r.pct} %), tid ${fmt(used)}`, ""];
+  QUESTIONS.forEach((q, qi) => {
+    const res = r.per[qi];
+    lines.push(`${qi + 1}. ${q.t}  [${res.score}/${res.max}]`);
+    state.answers[qi].forEach((a, fi) => lines.push(`   ${res.fieldToStep[fi] >= 0 ? "✓" : "✗"} ${a.trim() || "(tomt)"}`));
+    lines.push("");
+  });
+  return lines.join("\n");
+}
+
+async function sendMail(r, used) {
+  const st = $("mailStatus");
+  if (state.mailSent) { st.textContent = "Resultatet har skickats till läraren."; return; }
+  if (!MOTTAGARE_EPOST) { st.textContent = "Resultatet skickas inte automatiskt. Visa skärmen för din lärare."; return; }
+  st.textContent = "Skickar resultatet till läraren…";
+  try {
+    const res = await fetch("https://formsubmit.co/ajax/" + MOTTAGARE_EPOST, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        _subject: `Fysikprov: ${state.name} – betyg ${r.grade} (${r.score}/${r.max})`,
+        _template: "box", _captcha: "false",
+        Elev: state.name, Betyg: r.grade, Poang: `${r.score} av ${r.max} (${r.pct} %)`, Tid: fmt(used),
+        Svar: reportText(r, used),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && String(data.success) === "true") {
+      state.mailSent = true; save();
+      st.textContent = "Resultatet har skickats till läraren.";
+    } else {
+      st.textContent = "Resultatet kunde inte skickas till läraren. Visa skärmen för din lärare.";
+    }
+  } catch (e) {
+    st.textContent = "Resultatet kunde inte skickas (ingen anslutning). Visa skärmen för din lärare.";
+  }
+}
+
+function restart() {
+  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  location.reload();
+}
+
+$("startBtn").addEventListener("click", startExam);
+$("studentName").addEventListener("keydown", e => { if (e.key === "Enter") startExam(); });
+$("submitBtn").addEventListener("click", () => submit(false));
+
+load();
+if (state.submittedAt) showResult(state.submittedAt - state.startedAt >= TOTAL_MS);
+else if (state.startedAt) { if (Date.now() - state.startedAt >= TOTAL_MS) { state.submittedAt = state.startedAt + TOTAL_MS; save(); showResult(true); } else showRunning(); }
+else $("studentName").value = state.name || "";
+</script>
+
+</body>
+</html>

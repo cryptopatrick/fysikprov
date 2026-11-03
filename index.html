@@ -139,6 +139,10 @@ details.facit li.miss .tag { color: var(--bad); }
 .scale div.on b { color: var(--btn-fg); }
 .mail-status { font-size: .9rem; color: var(--muted); }
 .result-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.ai-note { display: block; color: var(--muted); }
+.grading { display: flex; gap: 16px; align-items: center; }
+.spinner { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; border: 3px solid var(--surface); border-top-color: var(--ok); animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 480px) {
   .brand span { display: none; }
@@ -149,6 +153,7 @@ details.facit li.miss .tag { color: var(--bad); }
 @media (prefers-reduced-motion: reduce) {
   .clock.running .clock-dot { animation: none; }
   .bar-fill { transition: none; }
+  .spinner { animation-duration: 3s; }
 }
 </style>
 
@@ -179,6 +184,7 @@ details.facit li.miss .tag { color: var(--bad); }
         <li>Klockan startar när du trycker på <strong>Starta provet</strong>, och provet lämnas in automatiskt när tiden är slut.</li>
         <li>Varje rätt steg ger 1 poäng. Totalt finns 78 poäng.</li>
         <li>När du är klar trycker du på <strong>LÄMNA IN</strong> längst ner.</li>
+        <li id="claudeInfo" hidden>Provet rättas av Claude. Stavfel spelar ingen roll – det är innehållet som räknas.</li>
       </ul>
       <div class="start-row">
         <label for="studentName" class="sr" hidden>Ditt namn</label>
@@ -202,6 +208,8 @@ details.facit li.miss .tag { color: var(--bad); }
 const MOTTAGARE_EPOST = "cryptopatrick@gmail.com";
 const PROVTID_MIN = 45;
 const STORE_KEY = "prov-atom-karnfysik-v1";
+// Sätts till true när sidan körs via den lokala servern (lokal/server.mjs), som låter Claude rätta.
+let LOKAL_CLAUDE = false;
 
 // k = nyckelordsgrupper. Ett fält räknas som rätt för steget om det innehåller minst ett ord ur VARJE grupp.
 // Orden skrivs utan å/ä/ö (texten normaliseras) och matchas som ordbörjan, med tolerans för ett stavfel.
@@ -465,11 +473,48 @@ function submit(timeUp) {
   }
   state.submittedAt = Math.min(Date.now(), state.startedAt + TOTAL_MS);
   save();
+  rattaOchVisa(timeUp);
+}
+
+// Låter Claude rätta via den lokala servern. Går det inte rättas provet med nyckelorden.
+async function rattaOchVisa(timeUp) {
+  if (LOKAL_CLAUDE && !state.ai && !state.aiFel) {
+    clearInterval(ticker);
+    $("clock").classList.remove("running");
+    $("intro").hidden = true;
+    $("submitZone").hidden = true;
+    qWrap.hidden = false;
+    if (!qWrap.children.length) buildQuestions();
+    qWrap.querySelectorAll("textarea").forEach(t => t.disabled = true);
+    const box = $("result");
+    box.hidden = false;
+    box.innerHTML = `<div class="grading" role="status"><span class="spinner" aria-hidden="true"></span>
+      <div><strong>Claude rättar ditt prov…</strong><p class="muted">Det brukar ta under en minut. Stäng inte sidan.</p></div></div>`;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const res = await fetch("/api/ratta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: state.name, answers: state.answers, startedAt: state.startedAt, submittedAt: state.submittedAt }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(data.per)) throw new Error(data.fel || "servern svarade med fel " + res.status);
+      state.ai = data.per;
+    } catch (e) {
+      state.aiFel = (e && e.message) || "okänt fel";
+    }
+    save();
+  }
   showResult(timeUp);
 }
 
 function computeAll() {
-  const per = QUESTIONS.map((q, qi) => gradeQuestion(q, state.answers[qi]));
+  const per = QUESTIONS.map((q, qi) => {
+    const ai = state.ai && state.ai[qi];
+    if (ai && Array.isArray(ai.fieldToStep) && ai.fieldToStep.length === q.s.length)
+      return { fieldToStep: ai.fieldToStep, kommentarer: ai.kommentarer || [], score: ai.fieldToStep.filter(s => s >= 0).length, max: q.s.length };
+    return gradeQuestion(q, state.answers[qi]);
+  });
   const score = per.reduce((n, r) => n + r.score, 0);
   const max = per.reduce((n, r) => n + r.max, 0);
   const pct = Math.round(score / max * 100);
@@ -503,7 +548,9 @@ function showResult(timeUp) {
       v.hidden = false;
       const s = res.fieldToStep[fi];
       if (s >= 0) { li.classList.add("ok"); v.textContent = `✓ Rätt – motsvarar steg ${s + 1} i facit`; }
-      else { li.classList.add("bad"); v.textContent = ta.value.trim() ? "✗ Matchar inget av de saknade stegen" : "✗ Tomt"; }
+      else { li.classList.add("bad"); v.textContent = ta.value.trim() ? (res.kommentarer ? "✗ Inget poäng" : "✗ Matchar inget av de saknade stegen") : "✗ Tomt"; }
+      const kommentar = res.kommentarer && res.kommentarer[fi];
+      if (kommentar) { const n = document.createElement("span"); n.className = "ai-note"; n.textContent = kommentar; v.appendChild(n); }
     });
     const hit = new Set(res.fieldToStep.filter(s => s >= 0));
     const det = document.createElement("details");
@@ -524,6 +571,7 @@ function showResult(timeUp) {
         <strong>${escapeHtml(state.name)}</strong>
         <span>${r.score} av ${r.max} poäng (${r.pct} %)</span>
         <span class="muted">Tid: ${fmt(used)} av ${PROVTID_MIN}:00${timeUp ? " – tiden tog slut" : ""}</span>
+        ${state.ai ? `<span class="muted">Rättat av Claude</span>` : state.aiFel ? `<span class="muted">Claude kunde inte rätta (${escapeHtml(state.aiFel)}) – provet rättades med nyckelord i stället.</span>` : ""}
       </div>
     </div>
     <div class="scale">${GRADES.slice().reverse().map(x =>
@@ -533,6 +581,24 @@ function showResult(timeUp) {
   $("restartBtn").addEventListener("click", restart);
   window.scrollTo({ top: 0, behavior: "smooth" });
   sendMail(r, used);
+  sparaResultat(r, used);
+}
+
+// Lägger till en rad i resultat.csv via den lokala servern (en gång per prov).
+async function sparaResultat(r, used) {
+  if (!LOKAL_CLAUDE || state.resultatSparat) return;
+  try {
+    const res = await fetch("/api/resultat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: state.name, prov: document.title, submittedAt: state.submittedAt, usedMs: used,
+        score: r.score, max: r.max, pct: r.pct, grade: r.grade, rattning: state.ai ? "Claude" : "Nyckelord",
+        perFraga: r.per.map(x => x.score),
+      }),
+    });
+    if (res.ok) { state.resultatSparat = true; save(); }
+  } catch (e) {}
 }
 
 function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -542,7 +608,10 @@ function reportText(r, used) {
   QUESTIONS.forEach((q, qi) => {
     const res = r.per[qi];
     lines.push(`${qi + 1}. ${q.t}  [${res.score}/${res.max}]`);
-    state.answers[qi].forEach((a, fi) => lines.push(`   ${res.fieldToStep[fi] >= 0 ? "✓" : "✗"} ${a.trim() || "(tomt)"}`));
+    state.answers[qi].forEach((a, fi) => {
+      lines.push(`   ${res.fieldToStep[fi] >= 0 ? "✓" : "✗"} ${a.trim() || "(tomt)"}`);
+      if (res.kommentarer && res.kommentarer[fi]) lines.push(`      → ${res.kommentarer[fi]}`);
+    });
     lines.push("");
   });
   return lines.join("\n");
@@ -561,6 +630,7 @@ async function sendMail(r, used) {
         _subject: `Fysikprov: ${state.name} – betyg ${r.grade} (${r.score}/${r.max})`,
         _template: "box", _captcha: "false",
         Elev: state.name, Betyg: r.grade, Poang: `${r.score} av ${r.max} (${r.pct} %)`, Tid: fmt(used),
+        Rattning: state.ai ? "Claude" : "Nyckelord",
         Svar: reportText(r, used),
       }),
     });
@@ -586,9 +656,15 @@ $("studentName").addEventListener("keydown", e => { if (e.key === "Enter") start
 $("submitBtn").addEventListener("click", () => submit(false));
 
 load();
-if (state.submittedAt) showResult(state.submittedAt - state.startedAt >= TOTAL_MS);
-else if (state.startedAt) { if (Date.now() - state.startedAt >= TOTAL_MS) { state.submittedAt = state.startedAt + TOTAL_MS; save(); showResult(true); } else showRunning(); }
-else $("studentName").value = state.name || "";
+(async () => {
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+    try { const r = await fetch("/api/status", { cache: "no-store" }); LOKAL_CLAUDE = r.ok && (await r.json()).claude === true; } catch (e) {}
+  }
+  $("claudeInfo").hidden = !LOKAL_CLAUDE;
+  if (state.submittedAt) rattaOchVisa(state.submittedAt - state.startedAt >= TOTAL_MS);
+  else if (state.startedAt) { if (Date.now() - state.startedAt >= TOTAL_MS) { state.submittedAt = state.startedAt + TOTAL_MS; save(); rattaOchVisa(true); } else showRunning(); }
+  else $("studentName").value = state.name || "";
+})();
 </script>
 
 </body>

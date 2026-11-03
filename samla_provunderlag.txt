@@ -1,0 +1,114 @@
+SAMLA PROVUNDERLAG – prompt för att skapa en pluggguide som kan bli ett prov
+===========================================================================
+
+Så använder du den här prompten
+-------------------------------
+1. Kopiera allt mellan raderna "BÖRJAN PÅ PROMPTEN" och "SLUT PÅ PROMPTEN" nedan.
+2. Klistra in den i Claude (eller en annan AI-assistent).
+3. Fyll i rutan "MITT PROV" längst upp i prompten.
+4. Lägg till ditt studiematerial efter prompten: text från läroboken, lärarens
+   genomgångar, en planering, en gammal pluggguide, bilder av sidor – allt som provet
+   bygger på. Ju mer, desto bättre.
+5. Läs igenom pluggguiden du får tillbaka och rätta det som är fel eller saknas.
+6. Ge den färdiga pluggguiden till Claude Code och skriv till exempel:
+   "Skapa ett nytt prov i samma format som prov/index.html utifrån den här pluggguiden.
+    Lägg det i en ny mapp, prov03."
+
+Pluggguide.pdf (atom- och kärnfysik) är förebilden. Prov 01 byggdes från den: varje
+fråga i guiden blev en provfråga, och varje steg blev ett svarsfält värt 1 poäng.
+
+
+------------------------------ BÖRJAN PÅ PROMPTEN ------------------------------
+
+Du ska hjälpa mig att göra en PLUGGGUIDE inför ett prov. Pluggguiden används till två
+saker: jag pluggar på den, och den blir sedan facit till ett digitalt prov som rättas
+automatiskt. Därför måste den följa formatet nedan exakt.
+
+MITT PROV
+- Ämne:                       [t.ex. Biologi]
+- Område:                     [t.ex. Cellen och arvet]
+- Årskurs:                    [t.ex. Åk 9]
+- Provtid i minuter:          [t.ex. 45]
+- Antal frågor (ungefär):     [t.ex. 15]
+- Betygsgränser:              [lämna tomt för standard: A 90 %, B 78 %, C 65 %, D 50 %, E 40 %]
+- Annat läraren har sagt:     [t.ex. "kunna förklara fotosyntesen steg för steg"]
+
+HUR PROVET FUNGERAR (så att du förstår varför formatet är som det är)
+- Varje fråga visas med texten "Kom ihåg N steg" och har N tomma svarsfält.
+- Eleven skriver ett steg per fält, med egna ord.
+- Varje steg i facit är värt 1 poäng. Ordningen spelar ingen roll för poängen.
+- Ett fält kan bara ge poäng för ett steg.
+- Claude rättar genom att jämföra varje fält med stegen i facit. Stavfel spelar ingen
+  roll – innehållet ska stämma.
+
+REGLER FÖR FRÅGORNA
+1. Använd bara mitt studiematerial. Hitta inte på fakta. Om något verkar fel eller
+   saknas i materialet, skriv det under "Frågor till mig" i slutet i stället för att gissa.
+2. Varje fråga ska vara en process, en förklaring, en jämförelse eller en uppräkning
+   som går att dela upp i steg. Bra frågeformer:
+     "Hur fungerar …?"  "Hur går … till?"  "Vad händer när …?"  "Vad är …?"
+     "Vad är skillnaden mellan … och …?"  "Vilka … ? Skriv namn + vad de gjorde."
+     Räknefrågor: "… Visa stegen."
+3. Varje fråga ska ha 4–7 steg. Hela provet bör ge ungefär 1,5–2 poäng per
+   provminut (45 min → 70–80 poäng).
+4. Täck hela området. Det viktigaste i materialet ska finnas med, och ingen fråga ska
+   handla om samma sak som en annan.
+
+REGLER FÖR STEGEN (viktigast – det är stegen som rättas)
+1. Ett steg = en enda tanke som går att bedöma som rätt eller fel på egen hand.
+   Bra:   "Styrstavarna absorberar neutroner."
+   Dåligt: "Styrstavarna absorberar neutroner och vattnet bromsar dem och reaktorn
+           kan stoppas."  (tre steg i ett)
+2. Stegen får inte överlappa. Två steg får inte gå att besvara med samma mening.
+3. Stegen ska stå i logisk ordning: vad som startar processen, vad som händer i
+   mitten och vad resultatet blir.
+4. Varje steg skrivs som en FETSTILT kärnmening (det eleven måste säga för att få
+   poäng) följd av en eller två meningar förklaring i vanlig stil.
+   Kärnmeningen ska vara kort, på elevens nivå, och innehålla de viktiga facktermerna.
+5. Räknefrågor: varje mellanled är ett steg, med siffran och enheten
+   (t.ex. "**Efter 8 dygn återstår 40 g.**").
+6. Uppräkningar (t.ex. forskare, exempel): varje punkt är ett steg i formen
+   "**Namn – vad hen gjorde.**". Lägg också gärna en tabell under.
+7. Undvik steg som bara är "ge ett exempel" utan att säga vilka exempel som räknas.
+
+FORMAT – följ exakt (Markdown)
+
+# Pluggguide
+## [Område]
+[Ämne] · [Årskurs] · [Provtid] minuter · [antal frågor] frågor · [totalt antal steg] poäng
+
+### 1. [Frågan, formulerad exakt som den ska stå på provet]
+**Kom ihåg [N] steg.**
+
+1. **[Kärnmening för steg 1.]** [Förklaring.]
+2. **[Kärnmening för steg 2.]** [Förklaring.]
+3. …
+
+**Minnesregel:** [Kort ramsa eller pilkedja, t.ex. "Bränsle → neutron → klyvning → energi".]
+
+(Valfritt, bara om det hjälper:)
+**Viktigt:** [Något man ofta missar eller blandar ihop.]
+**Exempel:** [Ett konkret exempel med siffror.]
+[En tabell som jämför begrepp, t.ex. alfa/beta/gamma.]
+
+### 2. [Nästa fråga]
+…
+
+## Testa dig själv inför provet
+[3–5 råd om hur man övar: t.ex. för varje process – vad startar den, vad händer i
+mitten och vad blir resultatet.]
+
+## Frågor till mig
+[Allt du var osäker på, eller som saknades i materialet. Skriv "Inga" om allt var klart.]
+
+KONTROLLERA INNAN DU SVARAR
+- Varje fråga har 4–7 numrerade steg, och "Kom ihåg N steg" stämmer med antalet.
+- Varje steg har en fetstilt kärnmening som går att rätta på egen hand.
+- Inga steg överlappar, inom samma fråga eller mellan frågor.
+- Totala antalet poäng i rubriken stämmer med summan av alla steg.
+- Allt kommer från mitt material.
+
+MITT STUDIEMATERIAL:
+[Klistra in eller bifoga här]
+
+------------------------------- SLUT PÅ PROMPTEN -------------------------------

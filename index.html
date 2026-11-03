@@ -140,6 +140,12 @@ details.facit li.miss .tag { color: var(--bad); }
 .mail-status { font-size: .9rem; color: var(--muted); }
 .result-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .ai-note { display: block; color: var(--muted); }
+.field.big { grid-template-columns: 1fr; }
+.field.big .num { display: none; }
+.field.big textarea { min-height: 150px; }
+.practice-opts { display: flex; flex-direction: column; gap: 6px; }
+.check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin-top: 4px; flex-shrink: 0; accent-color: var(--ok); }
 .grading { display: flex; gap: 16px; align-items: center; }
 .spinner { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; border: 3px solid var(--surface); border-top-color: var(--ok); animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -372,8 +378,11 @@ function gradeQuestion(q, answers) {
 function gradeFor(pct) { return GRADES.find(x => pct >= x.min).g; }
 
 /* ---------- Tillstånd ---------- */
-const TOTAL_MS = PROVTID_MIN * 60 * 1000;
-let state = { name: "", startedAt: null, answers: QUESTIONS.map(q => q.s.map(() => "")), submittedAt: null, mailSent: false };
+// state.urval (frågeindex) och state.stortFalt finns bara i ett "Öva på brister"-prov.
+let state = nyttState();
+function nyttState() {
+  return { name: "", startedAt: null, answers: QUESTIONS.map(q => q.s.map(() => "")), submittedAt: null, mailSent: false };
+}
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
@@ -381,6 +390,12 @@ function load() {
   } catch (e) {}
 }
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+
+const arOvning = () => Array.isArray(state.urval);
+const aktiva = () => arOvning() ? state.urval : QUESTIONS.map((_, i) => i);
+const provtidMin = () => state.provtidMin || PROVTID_MIN;
+const totalMs = () => provtidMin() * 60 * 1000;
+const B_GRANS = GRADES.find(x => x.g === "B").min;
 
 /* ---------- Gränssnitt ---------- */
 const $ = id => document.getElementById(id);
@@ -390,7 +405,9 @@ function autoGrow(el) { el.style.height = "auto"; el.style.height = el.scrollHei
 
 function buildQuestions() {
   qWrap.innerHTML = "";
-  QUESTIONS.forEach((q, qi) => {
+  const lista = aktiva();
+  lista.forEach((qi, ix) => {
+    const q = QUESTIONS[qi];
     const sec = document.createElement("section");
     sec.className = "q";
     sec.id = "q" + (qi + 1);
@@ -399,13 +416,16 @@ function buildQuestions() {
       <p class="muted">Kom ihåg <strong>${q.s.length} steg</strong>.</p>
       <ol class="fields"></ol>`;
     const ol = sec.querySelector(".fields");
-    q.s.forEach((_, si) => {
+    const antal = state.stortFalt ? 1 : q.s.length;
+    for (let si = 0; si < antal; si++) {
       const li = document.createElement("li");
-      li.className = "field";
+      li.className = "field" + (state.stortFalt ? " big" : "");
       const id = `a-${qi}-${si}`;
+      const etikett = state.stortFalt ? `Fråga ${qi + 1}, alla steg` : `Fråga ${qi + 1}, steg ${si + 1}`;
+      const ph = state.stortFalt ? `Skriv alla ${q.s.length} stegen här…` : `Steg ${si + 1}…`;
       li.innerHTML = `<span class="num" aria-hidden="true">${si + 1}</span>
         <div class="field-body">
-          <textarea id="${id}" rows="1" aria-label="Fråga ${qi + 1}, steg ${si + 1}" placeholder="Steg ${si + 1}…"></textarea>
+          <textarea id="${id}" rows="${state.stortFalt ? 5 : 1}" aria-label="${etikett}" placeholder="${ph}"></textarea>
           <span class="verdict" hidden></span>
         </div>`;
       const ta = li.querySelector("textarea");
@@ -418,9 +438,9 @@ function buildQuestions() {
         armed = false;
       });
       ol.appendChild(li);
-    });
+    }
     qWrap.appendChild(sec);
-    if (qi < QUESTIONS.length - 1) qWrap.appendChild(document.createElement("hr"));
+    if (ix < lista.length - 1) qWrap.appendChild(document.createElement("hr"));
   });
   requestAnimationFrame(() => qWrap.querySelectorAll("textarea").forEach(autoGrow));
 }
@@ -432,10 +452,10 @@ function fmt(ms) {
 
 let ticker = null;
 function tick() {
-  const left = TOTAL_MS - (Date.now() - state.startedAt);
+  const left = totalMs() - (Date.now() - state.startedAt);
   $("clockTime").textContent = fmt(left);
-  $("barFill").style.width = Math.max(0, left / TOTAL_MS * 100) + "%";
-  const low = left <= 10 * 60000, crit = left <= 5 * 60000;
+  $("barFill").style.width = Math.max(0, left / totalMs() * 100) + "%";
+  const low = left <= Math.min(10, provtidMin() / 4) * 60000, crit = left <= Math.min(5, provtidMin() / 8) * 60000;
   [$("clock"), $("clockWrap")].forEach(el => { el.classList.toggle("low", low && !crit); el.classList.toggle("critical", crit); });
   if (left <= 0) submit(true);
 }
@@ -464,14 +484,14 @@ let armed = false;
 function submit(timeUp) {
   if (state.submittedAt) return;
   if (!timeUp) {
-    const empty = state.answers.flat().filter(a => !a.trim()).length;
+    const empty = aktiva().flatMap(qi => state.answers[qi]).filter(a => !a.trim()).length;
     if (empty && !armed) {
       armed = true;
       $("submitHint").textContent = `Du har ${empty} tomma fält. Tryck på LÄMNA IN igen om du vill lämna in ändå.`;
       return;
     }
   }
-  state.submittedAt = Math.min(Date.now(), state.startedAt + TOTAL_MS);
+  state.submittedAt = Math.min(Date.now(), state.startedAt + totalMs());
   save();
   rattaOchVisa(timeUp);
 }
@@ -495,7 +515,10 @@ async function rattaOchVisa(timeUp) {
       const res = await fetch("/api/ratta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: state.name, answers: state.answers, startedAt: state.startedAt, submittedAt: state.submittedAt }),
+        body: JSON.stringify({
+          name: state.name, answers: state.answers, startedAt: state.startedAt, submittedAt: state.submittedAt,
+          urval: arOvning() ? state.urval : undefined, stortFalt: !!state.stortFalt,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !Array.isArray(data.per)) throw new Error(data.fel || "servern svarade med fel " + res.status);
@@ -530,17 +553,48 @@ function rattaOmMedClaude() {
   location.reload();
 }
 
+// Resultat per fråga: { falt: [{ steg: [stegindex], kommentar }], score, max }.
+function rattaFraga(q, qi) {
+  const answers = state.answers[qi];
+  const ai = state.ai && state.ai[qi];
+  let falt = null;
+  if (ai && Array.isArray(ai.falt) && ai.falt.length === answers.length) falt = ai.falt;
+  else if (ai && Array.isArray(ai.fieldToStep) && ai.fieldToStep.length === answers.length) // äldre sparade resultat
+    falt = ai.fieldToStep.map((s, fi) => ({ steg: s >= 0 ? [s] : [], kommentar: (ai.kommentarer || [])[fi] || "" }));
+  else if (state.stortFalt)
+    falt = [{ steg: q.s.map((st, si) => stepMatches(answers[0] || "", st) ? si : -1).filter(si => si >= 0), kommentar: "" }];
+  else
+    falt = gradeQuestion(q, answers).fieldToStep.map(s => ({ steg: s >= 0 ? [s] : [], kommentar: "" }));
+  return { falt, score: falt.reduce((n, f) => n + f.steg.length, 0), max: q.s.length };
+}
+
 function computeAll() {
-  const per = QUESTIONS.map((q, qi) => {
-    const ai = state.ai && state.ai[qi];
-    if (ai && Array.isArray(ai.fieldToStep) && ai.fieldToStep.length === q.s.length)
-      return { fieldToStep: ai.fieldToStep, kommentarer: ai.kommentarer || [], score: ai.fieldToStep.filter(s => s >= 0).length, max: q.s.length };
-    return gradeQuestion(q, state.answers[qi]);
-  });
-  const score = per.reduce((n, r) => n + r.score, 0);
-  const max = per.reduce((n, r) => n + r.max, 0);
+  const per = QUESTIONS.map((q, qi) => aktiva().includes(qi) ? rattaFraga(q, qi) : null);
+  const delar = per.filter(Boolean);
+  const score = delar.reduce((n, r) => n + r.score, 0);
+  const max = delar.reduce((n, r) => n + r.max, 0);
   const pct = Math.round(score / max * 100);
   return { per, score, max, pct, grade: gradeFor(pct) };
+}
+
+// Frågor där eleven fick under B-gränsen.
+function brister(r) {
+  return aktiva().filter(qi => r.per[qi].score / r.per[qi].max * 100 < B_GRANS);
+}
+
+function startaOvning(urval, stortFalt) {
+  const steg = urval.reduce((n, qi) => n + QUESTIONS[qi].s.length, 0);
+  const allaSteg = QUESTIONS.reduce((n, q) => n + q.s.length, 0);
+  state = {
+    ...nyttState(),
+    name: state.name,
+    urval, stortFalt,
+    provtidMin: Math.max(5, Math.ceil(PROVTID_MIN * steg / allaSteg)),
+    answers: QUESTIONS.map((q, qi) => urval.includes(qi) ? Array(stortFalt ? 1 : q.s.length).fill("") : []),
+    startedAt: Date.now(),
+  };
+  save();
+  location.reload();
 }
 
 function showResult(timeUp) {
@@ -553,12 +607,14 @@ function showResult(timeUp) {
 
   const r = computeAll();
   const used = state.submittedAt - state.startedAt;
-  $("clockTime").textContent = fmt(TOTAL_MS - used);
+  $("clockTime").textContent = fmt(totalMs() - used);
 
   // Markera varje fråga
-  QUESTIONS.forEach((q, qi) => {
+  aktiva().forEach(qi => {
+    const q = QUESTIONS[qi];
     const sec = $("q" + (qi + 1));
     const res = r.per[qi];
+    const medAi = !!(state.ai && state.ai[qi]);
     const badge = sec.querySelector(".score");
     badge.hidden = false;
     badge.textContent = `${res.score}/${res.max}`;
@@ -568,13 +624,19 @@ function showResult(timeUp) {
       ta.disabled = true;
       const v = li.querySelector(".verdict");
       v.hidden = false;
-      const s = res.fieldToStep[fi];
-      if (s >= 0) { li.classList.add("ok"); v.textContent = `✓ Rätt – motsvarar steg ${s + 1} i facit`; }
-      else { li.classList.add("bad"); v.textContent = ta.value.trim() ? (res.kommentarer ? "✗ Inget poäng" : "✗ Matchar inget av de saknade stegen") : "✗ Tomt"; }
-      const kommentar = res.kommentarer && res.kommentarer[fi];
-      if (kommentar) { const n = document.createElement("span"); n.className = "ai-note"; n.textContent = kommentar; v.appendChild(n); }
+      const f = res.falt[fi] || { steg: [], kommentar: "" };
+      if (f.steg.length) {
+        li.classList.add("ok");
+        v.textContent = state.stortFalt
+          ? `✓ ${f.steg.length} av ${q.s.length} steg – motsvarar steg ${f.steg.map(s => s + 1).join(", ")} i facit`
+          : `✓ Rätt – motsvarar steg ${f.steg[0] + 1} i facit`;
+      } else {
+        li.classList.add("bad");
+        v.textContent = ta.value.trim() ? (medAi ? "✗ Inget poäng" : "✗ Matchar inget av de saknade stegen") : "✗ Tomt";
+      }
+      if (f.kommentar) { const n = document.createElement("span"); n.className = "ai-note"; n.textContent = f.kommentar; v.appendChild(n); }
     });
-    const hit = new Set(res.fieldToStep.filter(s => s >= 0));
+    const hit = new Set(res.falt.flatMap(f => f.steg));
     const det = document.createElement("details");
     det.className = "facit";
     if (res.score < res.max) det.open = true;
@@ -584,6 +646,7 @@ function showResult(timeUp) {
   });
 
   // Sammanfattning
+  const svaga = brister(r);
   const box = $("result");
   box.hidden = false;
   box.innerHTML = `
@@ -591,8 +654,9 @@ function showResult(timeUp) {
       <div class="grade" aria-label="Betyg ${r.grade}">${r.grade}</div>
       <div class="result-facts">
         <strong>${escapeHtml(state.name)}</strong>
+        ${arOvning() ? `<span>Öva på brister: ${state.urval.length} ${state.urval.length === 1 ? "fråga" : "frågor"}${state.stortFalt ? ", ett stort fält per fråga" : ""}</span>` : ""}
         <span>${r.score} av ${r.max} poäng (${r.pct} %)</span>
-        <span class="muted">Tid: ${fmt(used)} av ${PROVTID_MIN}:00${timeUp ? " – tiden tog slut" : ""}</span>
+        <span class="muted">Tid: ${fmt(used)} av ${fmt(totalMs())}${timeUp ? " – tiden tog slut" : ""}</span>
         ${state.ai ? `<span class="muted">Rättat av Claude</span>` : state.aiFel ? `<span class="muted">Claude kunde inte rätta (${escapeHtml(state.aiFel)}) – provet rättades med nyckelord i stället.</span>` : ""}
       </div>
     </div>
@@ -602,9 +666,15 @@ function showResult(timeUp) {
     <div class="result-actions">
       ${LOKAL_CLAUDE && !state.ai ? `<button class="btn" id="regradeBtn" type="button">Rätta med Claude</button>` : ""}
       <button class="btn btn-ghost" id="restartBtn" type="button">Gör om provet</button>
-    </div>`;
+      <button class="btn" id="practiceBtn" type="button" ${svaga.length ? "" : "disabled"}>Öva på brister</button>
+    </div>
+    ${svaga.length ? `<div class="practice-opts">
+      <label class="check"><input type="checkbox" id="bigFields" ${state.stortFalt ? "checked" : ""}> Ett stort svarsfält per fråga (i stället för ett fält per steg)</label>
+      <p class="muted">Övningen tar med de ${svaga.length} ${svaga.length === 1 ? "fråga" : "frågor"} där du fick under B (${B_GRANS} %): ${svaga.map(qi => qi + 1).join(", ")}.</p>
+    </div>` : `<p class="muted">Alla frågor är på B-nivå eller bättre – inga brister att öva på.</p>`}`;
   $("restartBtn").addEventListener("click", restart);
   if ($("regradeBtn")) $("regradeBtn").addEventListener("click", rattaOmMedClaude);
+  if (svaga.length) $("practiceBtn").addEventListener("click", () => startaOvning(svaga, $("bigFields").checked));
   window.scrollTo({ top: 0, behavior: "smooth" });
   sendMail(r, used);
   sparaResultat(r, used);
@@ -618,9 +688,11 @@ async function sparaResultat(r, used) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: state.name, prov: document.title, startedAt: state.startedAt, submittedAt: state.submittedAt, usedMs: used,
+        name: state.name,
+        prov: document.title + (arOvning() ? ` – Öva på brister${state.stortFalt ? " (stora fält)" : ""}` : ""),
+        startedAt: state.startedAt, submittedAt: state.submittedAt, usedMs: used,
         score: r.score, max: r.max, pct: r.pct, grade: r.grade, rattning: state.ai ? "Claude" : "Nyckelord",
-        perFraga: r.per.map(x => x.score),
+        perFraga: r.per.map(x => x ? x.score : null),
       }),
     });
     if (res.ok) { state.resultatSparat = true; save(); }
@@ -631,12 +703,13 @@ function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<":
 
 function reportText(r, used) {
   const lines = [`${state.name}: betyg ${r.grade}, ${r.score}/${r.max} poäng (${r.pct} %), tid ${fmt(used)}`, ""];
-  QUESTIONS.forEach((q, qi) => {
+  aktiva().forEach(qi => {
     const res = r.per[qi];
-    lines.push(`${qi + 1}. ${q.t}  [${res.score}/${res.max}]`);
+    lines.push(`${qi + 1}. ${QUESTIONS[qi].t}  [${res.score}/${res.max}]`);
     state.answers[qi].forEach((a, fi) => {
-      lines.push(`   ${res.fieldToStep[fi] >= 0 ? "✓" : "✗"} ${a.trim() || "(tomt)"}`);
-      if (res.kommentarer && res.kommentarer[fi]) lines.push(`      → ${res.kommentarer[fi]}`);
+      const f = res.falt[fi] || { steg: [], kommentar: "" };
+      lines.push(`   ${f.steg.length ? "✓" : "✗"} ${a.trim() || "(tomt)"}`);
+      if (f.kommentar) lines.push(`      → ${f.kommentar}`);
     });
     lines.push("");
   });
@@ -645,6 +718,7 @@ function reportText(r, used) {
 
 async function sendMail(r, used) {
   const st = $("mailStatus");
+  if (arOvning()) { st.textContent = "Övningsprov – resultatet skickas inte till läraren."; return; }
   if (state.mailSent) { st.textContent = "Resultatet har skickats till läraren."; return; }
   if (!MOTTAGARE_EPOST) { st.textContent = "Resultatet skickas inte automatiskt. Visa skärmen för din lärare."; return; }
   st.textContent = "Skickar resultatet till läraren…";
@@ -682,13 +756,15 @@ $("studentName").addEventListener("keydown", e => { if (e.key === "Enter") start
 $("submitBtn").addEventListener("click", () => submit(false));
 
 load();
+if (arOvning()) document.querySelector(".brand span").textContent = "· Öva på brister";
+$("clockTime").textContent = fmt(totalMs());
 (async () => {
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
     try { const r = await fetch("/api/status", { cache: "no-store" }); LOKAL_CLAUDE = r.ok && (await r.json()).claude === true; } catch (e) {}
   }
   $("claudeInfo").hidden = !LOKAL_CLAUDE;
-  if (state.submittedAt) rattaOchVisa(state.submittedAt - state.startedAt >= TOTAL_MS);
-  else if (state.startedAt) { if (Date.now() - state.startedAt >= TOTAL_MS) { state.submittedAt = state.startedAt + TOTAL_MS; save(); rattaOchVisa(true); } else showRunning(); }
+  if (state.submittedAt) rattaOchVisa(state.submittedAt - state.startedAt >= totalMs());
+  else if (state.startedAt) { if (Date.now() - state.startedAt >= totalMs()) { state.submittedAt = state.startedAt + totalMs(); save(); rattaOchVisa(true); } else showRunning(); }
   else $("studentName").value = state.name || "";
 })();
 </script>

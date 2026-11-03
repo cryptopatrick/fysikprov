@@ -2,7 +2,7 @@
 // Starta:  node lokal/server.mjs   (från mappen prov)   – öppna sedan http://localhost:8080
 // Kräver att Claude Code (kommandot `claude`) är installerat och inloggat på datorn.
 import http from "node:http";
-import { readFileSync, mkdirSync, writeFileSync, appendFileSync, existsSync } from "node:fs";
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import vm from "node:vm";
@@ -20,7 +20,7 @@ function sparaResultat(r) {
   const cell = v => { const t = String(v ?? ""); return /[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
   if (!existsSync(RESULTATFIL)) {
     const rubrik = ["Datum", "Klockslag", "Namn", "Prov", "Poäng", "Max", "Procent", "Betyg", "Tid (min)", "Rättning",
-      ...fragor.map((q, i) => `F${i + 1} (av ${q.s.length})`)];
+      ...fragor.map((q, i) => `F${i + 1} (av ${q.s.length})`), "Prov-id"];
     writeFileSync(RESULTATFIL, "\uFEFF" + rubrik.join(";") + "\n");
   }
   const nu = new Date(r.submittedAt || Date.now());
@@ -32,8 +32,12 @@ function sparaResultat(r) {
     String(Math.round((Number(r.usedMs) || 0) / 6000) / 10).replace(".", ","),
     r.rattning === "Claude" ? "Claude" : "Nyckelord",
     ...fragor.map((_, i) => Number(perFraga[i]) || 0),
+    Number(r.startedAt) || "",
   ];
-  appendFileSync(RESULTATFIL, rad.map(cell).join(";") + "\n");
+  // Samma prov rättat igen (t.ex. med Claude efter nyckelord) ersätter sin gamla rad.
+  const id = Number(r.startedAt) ? ";" + Number(r.startedAt) : null;
+  const rader = readFileSync(RESULTATFIL, "utf8").split("\n").filter(l => l && !(id && l.endsWith(id)));
+  writeFileSync(RESULTATFIL, [...rader, rad.map(cell).join(";")].join("\n") + "\n");
 }
 
 // Frågor och facit läses ur provsidan, så servern och sidan har alltid samma facit.

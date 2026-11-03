@@ -501,11 +501,33 @@ async function rattaOchVisa(timeUp) {
       if (!res.ok || !Array.isArray(data.per)) throw new Error(data.fel || "servern svarade med fel " + res.status);
       state.ai = data.per;
     } catch (e) {
+      // TypeError = servern gick inte att nå (t.ex. "Load failed"). Svaren finns kvar – låt eleven försöka igen.
+      if (e instanceof TypeError) { visaServerFel(timeUp); return; }
       state.aiFel = (e && e.message) || "okänt fel";
     }
     save();
   }
   showResult(timeUp);
+}
+
+function visaServerFel(timeUp) {
+  const box = $("result");
+  box.innerHTML = `<div><strong>Rättningsservern går inte att nå.</strong>
+      <p class="muted">Dina svar är sparade. Kontrollera att provet är startat med <code>./run.sh</code> och tryck sedan på Försök igen.</p></div>
+    <div class="result-actions">
+      <button class="btn" id="retryBtn" type="button">Försök igen</button>
+      <button class="btn btn-ghost" id="keywordBtn" type="button">Rätta med nyckelord i stället</button>
+    </div>`;
+  $("retryBtn").addEventListener("click", () => rattaOchVisa(timeUp));
+  $("keywordBtn").addEventListener("click", () => { state.aiFel = "servern gick inte att nå"; save(); showResult(timeUp); });
+}
+
+// Rättar om ett prov med Claude, t.ex. om servern inte var igång vid inlämningen.
+function rattaOmMedClaude() {
+  delete state.aiFel;
+  state.resultatSparat = false;
+  save();
+  location.reload();
 }
 
 function computeAll() {
@@ -577,8 +599,12 @@ function showResult(timeUp) {
     <div class="scale">${GRADES.slice().reverse().map(x =>
       `<div class="${x.g === r.grade ? "on" : ""}"><b>${x.g}</b>${x.g === "F" ? "&lt; 40 %" : "≥ " + x.min + " %"}</div>`).join("")}</div>
     <p class="mail-status" id="mailStatus"></p>
-    <div class="result-actions"><button class="btn btn-ghost" id="restartBtn" type="button">Gör om provet</button></div>`;
+    <div class="result-actions">
+      ${LOKAL_CLAUDE && !state.ai ? `<button class="btn" id="regradeBtn" type="button">Rätta med Claude</button>` : ""}
+      <button class="btn btn-ghost" id="restartBtn" type="button">Gör om provet</button>
+    </div>`;
   $("restartBtn").addEventListener("click", restart);
+  if ($("regradeBtn")) $("regradeBtn").addEventListener("click", rattaOmMedClaude);
   window.scrollTo({ top: 0, behavior: "smooth" });
   sendMail(r, used);
   sparaResultat(r, used);
@@ -592,7 +618,7 @@ async function sparaResultat(r, used) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: state.name, prov: document.title, submittedAt: state.submittedAt, usedMs: used,
+        name: state.name, prov: document.title, startedAt: state.startedAt, submittedAt: state.submittedAt, usedMs: used,
         score: r.score, max: r.max, pct: r.pct, grade: r.grade, rattning: state.ai ? "Claude" : "Nyckelord",
         perFraga: r.per.map(x => x.score),
       }),

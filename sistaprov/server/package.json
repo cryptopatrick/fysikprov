@@ -1,0 +1,9 @@
+{
+  "name": "sistaprov-rattning",
+  "private": true,
+  "type": "module",
+  "description": "Rättningsserver för sistaprov – Claude rättar elevsvar",
+  "scripts": { "start": "node server.mjs" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "@anthropic-ai/sdk": "^1.4.0" }
+}

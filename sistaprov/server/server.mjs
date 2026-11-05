@@ -8,6 +8,7 @@
 //   TILLATNA        kommaseparerade origins som får anropa (standard: GitHub Pages + localhost)
 //   PROV_MODELL     Claude-modell (standard claude-opus-5-5)
 //   MAX_PER_DAG     högst så många rättningar per dygn totalt (standard 300)
+//   LOGGMAPP        mapp för loggade svar (standard ./svar/)
 import http from "node:http";
 import { readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import vm from "node:vm";
@@ -26,7 +27,7 @@ const STATISKA = {
   "/index.html": ["index.html", "text/html; charset=utf-8"],
   "/fragor.js": ["fragor.js", "text/javascript; charset=utf-8"],
 };
-const LOGGMAPP = new URL("./svar/", import.meta.url);
+const LOGGMAPP = process.env.LOGGMAPP ? new URL("file://" + process.env.LOGGMAPP.replace(/\/?$/, "/")) : new URL("./svar/", import.meta.url);
 
 const client = new Anthropic({ timeout: 150_000, maxRetries: 2 });
 
@@ -212,7 +213,8 @@ const server = http.createServer(async (req, res) => {
   for (const qi of urval) svar[qi] = String(in_.svar?.[qi] ?? "").trim().slice(0, 4000);
   const namn = String(in_.namn || "").slice(0, 100);
 
-  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  // X-Real-IP sätts av nginx; X-Forwarded-For kan klienten själv fylla i.
+  const ip = String(req.headers["x-real-ip"] || req.socket.remoteAddress || "").trim();
   const stopp = tillats(ip);
   if (stopp) return json(429, { fel: stopp });
 

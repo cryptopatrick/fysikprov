@@ -1,0 +1,47 @@
+# /etc/systemd/system/sistaprov.service – rättningsservern för sistaprov (49-12-204-84.sslip.io)
+[Unit]
+Description=Sistaprov rättningsserver (Claude)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sistaprov
+Group=sistaprov
+WorkingDirectory=/opt/sistaprov/app/server
+# ANTHROPIC_API_KEY=... (läsbar bara för root, 0600)
+EnvironmentFile=/etc/sistaprov.env
+Environment=PORT=8791 LOGGMAPP=/var/lib/sistaprov NODE_ENV=production
+ExecStart=/opt/sistaprov/node/bin/node server.mjs
+Restart=on-failure
+RestartSec=2
+StateDirectory=sistaprov
+
+MemoryMax=512M
+CPUQuota=100%
+TasksMax=64
+LimitNOFILE=1024
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
